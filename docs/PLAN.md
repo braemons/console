@@ -109,8 +109,11 @@ Consequences worth writing down:
 
 - **It runs on the experimenter's machine, not the rig** — that is what makes
   multi-rig work at all, and it is why `base` is an attribute.
-- **It gives the console one stable origin**, which matters because every daemon
-  then has one origin to allow through CORS rather than "whatever laptop".
+- **It does not give the daemons a stable origin to trust.** An earlier draft
+  claimed this as a benefit; it is not one. The helper serves the shell, but the
+  *browser* is what talks to each daemon, so a daemon still sees "whatever
+  laptop" as the origin. That is settled by §7 (CORS `*`, network-level
+  security), not by the helper.
 - **`avahi-browse` rather than a zeroconf npm package**, so the console keeps
   zero dependencies (§6). A rig network already runs avahi; vstimd's `.deb`
   Recommends it. On a machine without it, discovery degrades to the configured
@@ -192,20 +195,57 @@ arise, because the console bundles nothing. The build question belongs to each
 daemon, and **only vstimd has one** — see `docs/BUILD_TOOLING.md` and vstimd's
 `dev/design/WEB_BUILD_TOOLING.md` on the branch `explore/web-build-tooling`.
 
-## 7. Security, which is a decision and not a discovery
+## 7. Security: the network is the boundary
 
-triald binds localhost by default because a policy is Python running in the
-daemon's process — remote code execution by design, deliberately. statemachined's
-CORS is `*` today. A console is an argument for exposing all three daemons on the
-rig network, and that argument should be made explicitly rather than arrived at
-because the console needed it.
+**Decided: every daemon is exposed on the rig network, and security is enforced
+at the network level rather than in the daemons.** No per-daemon authentication,
+no token, no per-origin CORS allowlist. For now.
 
-Not solved here, and the console must not pretend otherwise. What it can do
-meanwhile: run on the experimenter's machine (so the daemons need only allow that
-host), and never proxy a daemon's API, so it adds no new reachable surface of its
-own. What has to be decided before this is deployed on a shared network: whether
-`*` is acceptable for `/elements/` (probably; it is static JS) and for `/api/`
-(probably not).
+This is a real choice and not an omission, so it is worth writing down what it
+buys, what it costs, and the condition it depends on.
+
+**What it buys.** The console works. A console runs on whatever laptop the
+experimenter carried into the room, which means a daemon cannot know its origin
+in advance — so `*` on `/elements/` and `/api/` is not a shortcut here, it is the
+only thing that works without a registration step nobody wants to operate. It
+also means no credential has to be distributed to, stored on, or rotated across
+a set of rig boxes, which is the part of "just add auth" that actually costs
+something in a lab.
+
+**What it costs, stated plainly.** Anyone with a route to the rig network can:
+
+- run arbitrary Python in triald's process — a policy is remote code execution
+  *by design*, and that is the daemon's whole point;
+- drive the valve and every other output line through statemachined;
+- change what is on the screen in front of an animal, mid-session.
+
+There is no defence against any of that inside the daemons, by this decision.
+
+**The condition this rests on: the rig network is isolated.** Not "behind the
+institute firewall" — isolated: its own segment or VLAN, no route from the
+general network, no port forwarding. If that stops being true, this section
+expires and the daemons need something real. It is the *only* control, so it
+should be the deliberate kind rather than the assumed kind.
+
+**Two consequences for the console specifically**, both of which make it *more*
+important that the console holds no domain logic and proxies nothing (§1, §3):
+
+- **The console must never become a bridge.** It runs on the experimenter's
+  machine, which is frequently a laptop with a route to the wider network as
+  well. A console that proxied a daemon's API would be exactly the hole this
+  decision assumes does not exist — one hop from anywhere the laptop can reach
+  into the rig network. It does not proxy: the browser talks to each daemon
+  directly, and the helper (§3) serves static files and a DNS-SD browse and
+  nothing else. **This is now a security property, not just a tidiness one.**
+- **The helper binds loopback.** `127.0.0.1`, not `0.0.0.0`, because it has no
+  reason to be reachable and the machine it runs on is the least trusted thing
+  in the picture.
+
+**What changes if a daemon is ever reached from outside the rig network** — a
+recording from home, a second site — is a VPN or an authenticating reverse proxy
+in front of the whole segment, not authentication added to three daemons in three
+languages. Keeping the boundary in one place is the thing this decision is
+actually choosing.
 
 ## 8. What is next, in order
 

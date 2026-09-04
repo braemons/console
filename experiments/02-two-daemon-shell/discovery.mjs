@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Finding the daemons on a rig, on behalf of a browser that cannot.
 //
 // **This is why the console needs a host-side process at all.** A browser can

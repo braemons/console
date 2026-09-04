@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The `/elements/` contract, for vstimd.
 //
 // **This file is a prototype of something that belongs upstream in vstimd**, at

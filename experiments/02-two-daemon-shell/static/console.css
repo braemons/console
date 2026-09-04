@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
 /* The shell's chrome, and nothing else.
  *
  * Every panel on the page has a shadow root, so none of these selectors can

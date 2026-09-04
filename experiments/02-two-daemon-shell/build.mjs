@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Build the prototype vstimd elements bundle, and serve the shell.
 //
 // esbuild and nothing else: no Vite, no config file, no plugins. See

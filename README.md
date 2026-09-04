@@ -49,9 +49,26 @@ node serve.mjs          # http://127.0.0.1:9000
 with a `statemachined serve` and a `vstimd --null --web-port 8150` running. See
 that experiment's README for what it proves and what it fakes.
 
+## Security
+
+Every daemon is exposed on the rig network, and **the rig network is the security
+boundary** — there is no authentication in any of them, and CORS is `*`. That is
+a deliberate choice with one precondition: the rig network must be *isolated*,
+not merely behind the institute firewall. `docs/PLAN.md` §7 says what it buys,
+what it costs, and when it expires.
+
+The console does not proxy any daemon's API and its helper binds loopback, so it
+never becomes a route from a laptop's other networks into the rig's. Under this
+decision that is a security property rather than a tidiness one.
+
 ## What is next
 
 `docs/PLAN.md` §8, shortest first: a shared `rig=` mDNS record so two daemons on
 one box can be recognised as one rig; `/elements/vstimd.js` and CORS in vstimd;
 and a `--braemons-*` custom-property contract for theming, agreed while there are
 two UIs and not five.
+
+## License
+
+GNU AGPLv3, matching vstimd and triald. Copyright © 2026 Joscha Schmiedt,
+University of Bremen.

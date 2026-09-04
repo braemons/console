@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // The console, as a host-side process: static files, plus the one thing a
 // browser cannot do for itself.
 //
@@ -70,6 +71,11 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// Loopback, not 0.0.0.0. The daemons are exposed on the rig network and the
+// network is the security boundary (docs/PLAN.md §7) -- which makes the machine
+// this runs on, usually a laptop with a route to the wider network too, the
+// least trusted thing in the picture. It has no reason to be reachable, so it
+// is not.
 server.listen(PORT, "127.0.0.1", () =>
   console.log(`braemons console (experiment) on http://127.0.0.1:${PORT}`),
 );
