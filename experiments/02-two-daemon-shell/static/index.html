@@ -1,0 +1,35 @@
+<!doctype html>
+<!--
+  The braemons console — experiment 02.
+
+  No build step, no framework, no CDN: triald's rule and statemachined's, for
+  their reason (a rig box may have no route to the internet, and a browser in a
+  booth must not wait on unpkg). Unlike those two, the console is not served by
+  a daemon, so it also has no domain logic to build: every panel below is a
+  custom element fetched from the daemon that owns the hardware it is about.
+
+  What the console owns is on this page in its entirety: discovery, nav, layout,
+  and one status line per daemon.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>braemons console</title>
+    <link rel="stylesheet" href="/console.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <h1>braemons</h1>
+      <nav id="rig-nav" class="rig-nav"></nav>
+      <span class="grow"></span>
+      <span id="discovery-state" class="muted">discovering…</span>
+    </header>
+
+    <div id="banner" class="banner" hidden></div>
+
+    <main id="panels"></main>
+
+    <script type="module" src="/console.js"></script>
+  </body>
+</html>

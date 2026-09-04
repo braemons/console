@@ -1,0 +1,16 @@
+[
+  {
+    "daemon": "statemachined",
+    "name": "bench board",
+    "base": "http://127.0.0.1:8081",
+    "elements": "/elements/statemachined.js",
+    "rig": "bench"
+  },
+  {
+    "daemon": "vstimd",
+    "name": "bench display",
+    "base": "http://127.0.0.1:8150",
+    "elements": "http://127.0.0.1:9000/vstimd-elements/vstimd.js",
+    "rig": "bench"
+  }
+]

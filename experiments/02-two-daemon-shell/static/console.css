@@ -1,0 +1,38 @@
+/* The shell's chrome, and nothing else.
+ *
+ * Every panel on the page has a shadow root, so none of these selectors can
+ * reach into one. That is the property the whole layout rests on: three teams'
+ * UIs on one page, and `.card` here cannot collide with `.card` in triald's
+ * ~600 lines of global selectors. It is native, and it needs no tooling. */
+
+:root { color-scheme: dark; --bg: #141414; --panel: #1a1a1a; --line: #333; --dim: #888; --ok: #4c8; --bad: #c44; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: #ddd; font: 14px/1.5 system-ui, sans-serif; }
+
+.bar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.bar h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0.02em; }
+.grow { flex: 1; }
+.muted { color: var(--dim); font-size: 12px; }
+
+.rig-nav { display: flex; gap: 4px; }
+.rig-nav button { background: none; border: 1px solid var(--line); color: #ccc; padding: 4px 10px; border-radius: 4px; cursor: pointer; font: inherit; font-size: 13px; }
+.rig-nav button[aria-current="true"] { background: #262626; color: #fff; border-color: #555; }
+
+.banner { margin: 8px 16px; padding: 8px 12px; border-radius: 4px; background: #3a1f1f; border: 1px solid #6a3030; }
+.banner.info { background: #1f2a3a; border-color: #30506a; }
+
+main { padding: 16px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+
+/* One wrapper per panel: the console's own frame around somebody else's
+ * element. It carries the daemon's name and the panel's state, because a
+ * console that cannot say *which* daemon went quiet is not saying anything. */
+.slot { border: 1px solid var(--line); border-radius: 6px; background: var(--panel); min-width: 280px; }
+.slot > .slot-head { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.slot > .slot-head .daemon { color: #ccc; font-weight: 600; }
+.slot > .slot-head .tag { color: var(--dim); font-family: ui-monospace, monospace; }
+.slot > .slot-head .state { margin-left: auto; }
+.state.ok { color: var(--ok); }
+.state.bad { color: var(--bad); }
+.slot > .slot-body { padding: 8px; }
+
+.note { color: var(--dim); font-size: 12px; padding: 0 16px 16px; max-width: 70ch; }
