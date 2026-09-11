@@ -11,7 +11,7 @@ repo as their consumer. **This document does not relitigate that.** It records
 what building a working two-daemon console against it showed — including four
 things that do not work yet — and fills in the parts §5 left to this repo.
 
-Everything below marked **verified** was run; see `experiments/`.
+Everything below marked **verified** was run; see docs/FINDINGS.md.
 
 ---
 
@@ -50,7 +50,7 @@ release cadences, and would be wrong about a field the first time any of them
 shipped. Here, a daemon that adds a field ships the panel that shows it, in the
 same artefact, and the console does not know it happened.
 
-**Verified**: `experiments/02-two-daemon-shell` puts three statemachined panels
+**Verified**: the console puts three statemachined panels
 and three vstimd panels on one page against a real Uno R4 board and a live
 `vstimd --null`, and drives vstimd from inside the console (clicking `+ Rect` in
 the embedded panel creates a stimulus on the daemon).
@@ -63,14 +63,14 @@ every attribute a string. That is §5's decision and it holds up.
 **What it buys, verified.** Six panels from two codebases on one page, no class
 collisions, no shared framework, no build coupling. vstimd is React; the other
 two are vanilla; nobody had to change. Wrapping React panels as elements cost
-~40 lines (`experiments/02-two-daemon-shell/vstimd-elements/`) and changed
+~40 lines (`(moved upstream into vstimd's client/web/src/elements/)`) and changed
 nothing inside the panels.
 
 **What it costs, and this is not in §5: there is no theming.** Shadow roots stop
 the console's CSS reaching in — which is the point — but they stop it reaching in
 when it is *wanted* too. On one page, statemachined's panels are light and
 vstimd's are dark, and it looks like what it is: two applications sharing a
-scrollbar. See the screenshot in `experiments/02-two-daemon-shell/README.md`.
+scrollbar. See the screenshot in `docs/FINDINGS.md`.
 
 The fix is cheap and standard, and it has to be agreed **now**, while there are
 two UIs and not five: **CSS custom properties inherit through shadow
@@ -101,7 +101,7 @@ served off a rig, and cannot be a page served off anything without a helper.
 
 That helper is the console, and it is small: a static file server plus one route
 that shells out to `avahi-browse -rpt` and returns JSON
-(`experiments/02-two-daemon-shell/discovery.mjs`, ~90 lines, no dependencies).
+(`discovery.mjs`, ~90 lines, no dependencies).
 It speaks to no daemon and holds no state, so it is never in the path of
 anything a person is watching and a bug in it cannot make a rig look wrong.
 
@@ -147,7 +147,7 @@ Three fixes, in order of preference:
    it answers a different question ("which vstimd"), which is worth keeping
    distinct from "which rig". This is a few lines in each daemon and it is the
    right answer.
-2. Group by resolved host name. What `experiments/02` does today, and it is a
+2. Group by resolved host name. What the console does today, and it is a
    guess: it says two daemons answering on one name are one rig, which is usually
    true and is not true behind a reverse proxy or on a box running two rigs'
    daemons. The experiment therefore **says on screen** when it fell back to
@@ -249,18 +249,44 @@ actually choosing.
 
 ## 8. What is next, in order
 
+**Done since this document's last update:**
+
+- **vstimd serves its own `/elements/vstimd.js`, with CORS**, from
+  `client/web/src/elements/vstimd_elements.tsx` — a second Vite entry
+  (`vite.elements.config.ts`, library mode, one self-contained ES module) built
+  alongside the main app and embedded the same way. The console-side stand-in
+  this used to be (`vstimd-elements/`, `build.mjs`) is gone; `rigs.json` now
+  points at vstimd's own daemon like it does for the other two. What is still
+  open: a usable mDNS record for it (§4 — the port and path records vstimd's
+  `.service` template does not carry).
+- **triald `/elements/triald.js`** — six panels (session, sets, counters,
+  trial log, config, the simulated-subject bench), the third daemon no longer
+  the odd one out. triald's own page (`/`) is built from the same six
+  elements now too, so there is one implementation of each panel, not two that
+  can drift.
+- **The layout respects panel sizes, and then some.** Every panel is
+  independently reorderable (drag its header) and resizable (native `resize:
+  both`, optionally snapped to a grid), and can be docked or hidden and
+  brought back — all remembered per rig. Still a guess made by the console's
+  own frame, not a size the panel declares (§2's `--braemons-panel-width`
+  idea remains undone), but no longer "the console flex-wraps and guesses"
+  with no way to fix it by hand.
+
+**Still open, in order:**
+
 1. **`rig=` in every daemon's TXT record** (§4). Nothing else is correct without
    it, and it is the smallest change here.
-2. **vstimd: `/elements/vstimd.js` + CORS + a usable mDNS record** (§4, and
-   vstimd's `WEB_BUILD_TOOLING.md` §5). The wrapper is written and working in
-   `experiments/02`; it needs to move upstream, where it stops being a
-   cross-repo hack and becomes a second build entry point.
-3. **The `--braemons-*` theming contract** (§2), agreed while there are two UIs.
-4. **triald `/elements/triald.js`** — the third daemon, still vanilla, still no
-   build step.
-5. **Promote `experiments/02` to the console proper**: rig switching, a layout
-   that respects panel sizes, and the mDNS path exercised against real
-   advertisements rather than `rigs.json`.
+2. **The `--braemons-*` theming contract** (§2), agreed while there are three
+   UIs and it is still cheap: statemachined is light, vstimd is dark, triald's
+   own colours are whatever this repo just picked for the console's frame
+   around it. Panel *content* still cannot be made to match across a shadow
+   root without it.
+3. **vstimd's mDNS record** (§4): still the ZMQ port, no `api`/`elements`/web
+   port, and from a `.service` template that cannot know the port the server
+   was actually given — same problem `rig=` has, same fix shape.
+4. **Rig switching against real mDNS advertisements**, exercised against more
+   than one rig, rather than `rigs.json` alone. `rigs.json` stays regardless —
+   configured rigs are a first-class path (§3), not only a fallback.
 
 ## Non-goals
 

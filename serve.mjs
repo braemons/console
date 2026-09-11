@@ -7,16 +7,14 @@
 //   GET /api/rigs   the DNS-SD browse, as JSON (discovery.mjs)
 //   GET /*          the shell, from static/
 //
-// It speaks to no daemon. Every panel on the page is an element served by the
-// daemon that owns the hardware it is about, and it fetches its own data from
-// that daemon directly -- so this process is never in the path of anything a
-// person is watching, and a bug in it cannot make a rig look wrong.
-//
-// In this experiment it also serves the prototype vstimd elements bundle out of
-// static/vstimd-elements/, standing in for the `/elements/vstimd.js` that
-// vstimd does not serve yet (see vstimd-elements/vstimd_elements.tsx). That is
-// the *only* place this shell holds anything daemon-specific, and it is the
-// thing the experiment is asking vstimd to take over.
+// It speaks to no daemon and holds nothing daemon-specific at all. Every
+// panel on the page is an element served by the daemon that owns the
+// hardware it is about, fetched by the browser directly from that daemon's
+// own `/elements/<name>.js` -- this process never touches one. That is what
+// keeps a bug here from being able to make a rig look wrong, and it is why
+// `rigs.json`'s `elements` field for every daemon is either a bare path
+// (resolved against that daemon's own `base`) or that daemon's own absolute
+// URL, never a URL back into this server.
 
 import http from "node:http";
 import { readFile } from "node:fs/promises";
@@ -60,10 +58,13 @@ const server = http.createServer(async (req, res) => {
 
   try {
     const body = await readFile(file);
-    // Nothing is cached, for the reason statemachined gives for its own
-    // assets: one process serving both the shell and the elements contract it
-    // depends on is what keeps them the same version during development.
-    res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream", "cache-control": "no-store" });
+    // Not cached: the shell is small, changes during development, and this
+    // process's whole reason for existing is being trivial to keep in sync
+    // with what it serves.
+    res.writeHead(200, {
+      "content-type": TYPES[extname(file)] ?? "application/octet-stream",
+      "cache-control": "no-store",
+    });
     res.end(body);
   } catch {
     res.writeHead(404, { "content-type": "text/plain" });
@@ -77,5 +78,5 @@ const server = http.createServer(async (req, res) => {
 // least trusted thing in the picture. It has no reason to be reachable, so it
 // is not.
 server.listen(PORT, "127.0.0.1", () =>
-  console.log(`braemons console (experiment) on http://127.0.0.1:${PORT}`),
+  console.log(`braemons console on http://127.0.0.1:${PORT}`),
 );

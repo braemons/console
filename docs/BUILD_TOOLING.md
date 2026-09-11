@@ -18,7 +18,30 @@ measurements are in vstimd's `dev/design/WEB_BUILD_TOOLING.md`, on the branch
 
 Vite does exactly three things for vstimd — TS/JSX, bundling bare specifiers, and
 a dev proxy — and esbuild plus forty lines does all three, verified against the
-whole browser suite (`experiments/01-no-vite`).
+whole browser suite:
+
+```console
+$ VSTIMD_BIN=target/release/vstimd npx playwright test -c playwright.novite.config.ts
+Running 8 tests using 1 worker
+  ✓ boots and connects                                        (402ms)
+  ✓ creates a stimulus                                        (302ms)
+  ✓ toggles a VTL bit in the binary grid                      (317ms)
+  ✓ lists an animation and arms it                            (242ms)
+  ✓ couple-visibility dialog can target an output line        (345ms)
+  ✓ system: Hide all disables every stimulus                  (231ms)
+  ✓ scene-config: save then load restores the scene           (426ms)
+  ✓ drag on the map moves the stimulus (RF mapping)           (379ms)
+  8 passed (3.8s)
+```
+
+Two bugs found running that suite without Vite, worth knowing about regardless
+of which bundler ends up in front of them:
+
+- esbuild with `write: false` and `sourcemap: true` returns **two** output files
+  and the map is not last. Taking `outputFiles[0]` serves the sourcemap as the
+  bundle, and the browser says `Unexpected token ':'`.
+- vstimd's `playwright/smoke.spec.ts` hard-coded the backend port, so the suite
+  could not run against a second backend. Fixed with `SMOKE_BACKEND`, defaulted.
 
 The reason to keep it anyway is a dependency that does not go away: **`vitest`
 depends on `vite`**, and vstimd's node WebSocket e2e runs under vitest. Porting

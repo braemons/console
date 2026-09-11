@@ -9,7 +9,7 @@
 //
 // That something is small: this file plus a static file server. It holds no
 // domain logic and speaks to no daemon; it converts a DNS-SD browse into JSON
-// and stops. See ../../docs/PLAN.md §3.
+// and stops. See docs/PLAN.md §3.
 //
 // avahi-browse rather than a zeroconf library, because the console needs no
 // npm dependencies at all this way, and because a rig box already runs

@@ -9,8 +9,15 @@
   {
     "daemon": "vstimd",
     "name": "bench display",
-    "base": "http://127.0.0.1:8150",
-    "elements": "http://127.0.0.1:9000/vstimd-elements/vstimd.js",
+    "base": "http://127.0.0.1:8080",
+    "elements": "/elements/vstimd.js",
+    "rig": "bench"
+  },
+  {
+    "daemon": "triald",
+    "name": "bench trials",
+    "base": "http://127.0.0.1:8420",
+    "elements": "/elements/triald.js",
     "rig": "bench"
   }
 ]
