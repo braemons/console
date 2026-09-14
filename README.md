@@ -73,5 +73,5 @@ advertisements rather than `rigs.json` alone.
 
 ## License
 
-GNU AGPLv3, matching vstimd and triald. Copyright © 2026 Joscha Schmiedt,
+GNU AGPLv3-or-later, matching vstimd and triald. Copyright © 2026 Joscha Schmiedt,
 University of Bremen.
