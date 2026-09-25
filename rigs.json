@@ -19,5 +19,12 @@
     "base": "http://127.0.0.1:8420",
     "elements": "/elements/triald.js",
     "rig": "bench"
+  },
+  {
+    "daemon": "mousewheeld",
+    "name": "bench wheel",
+    "base": "http://127.0.0.1:8083",
+    "elements": "/elements/mousewheeld.js",
+    "rig": "bench"
   }
 ]

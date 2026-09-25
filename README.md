@@ -1,11 +1,12 @@
 # braemons console
 
-One page for a rig: the display, the state machine, and the trial logic
-together, from a laptop rather than from the one keyboard in the booth.
+One page for a rig: the display, the state machine, the trial logic and the
+wheel together, from a laptop rather than from the one keyboard in the booth.
 
 The console integrates the UIs of [vstimd](https://github.com/braemons/vstimd),
-[statemachined](https://github.com/braemons/statemachined) and
-[triald](https://github.com/braemons/triald) — and holds **no domain logic of
+[statemachined](https://github.com/braemons/statemachined),
+[triald](https://github.com/braemons/triald) and
+[mousewheeld](https://github.com/braemons/mousewheeld) — and holds **no domain logic of
 its own**. Every panel it shows is a custom element served by the daemon that
 owns the hardware it is about, at that daemon's own version, talking to that
 daemon directly. The console discovers the daemons, lays their panels out, and
@@ -28,7 +29,7 @@ says which of them answered.
   anyway.)
 
 The architecture is mostly not this repo's invention: statemachined's
-`dev/DAEMON.md` §5 specifies the `/elements/` contract and the mDNS record, and
+`docs/developer/daemon.md` §5 specifies the `/elements/` contract and the mDNS record, and
 names this repo as their consumer.
 
 ## Running it
@@ -37,7 +38,9 @@ names this repo as their consumer.
 node serve.mjs          # http://127.0.0.1:9000
 ```
 
-with a `statemachined serve`, a `triald serve` and a `vstimd` running.
+with any of `statemachined serve`, `triald serve`, `vstimd` and
+`mousewheeld serve` running (`mousewheeld serve --simulate` needs no board).
+A daemon that is not running shows up as a panel that says so.
 `rigs.json` is where a rig goes if mDNS cannot find it — a supported path
 (`docs/PLAN.md` §3), not only a fallback for this bench setup.
 
@@ -48,7 +51,7 @@ Every panel is independently **reorderable** (drag its header), **resizable**
 the way, coming right back — the strip below the banner) or **hidden**
 (further out, for the rest of the session — the tray under that). All of it
 is remembered per rig. A panel's frame is coloured by which daemon it came
-from, so three UIs on one page stay tellable apart at a glance without any of
+from, so four UIs on one page stay tellable apart at a glance without any of
 them agreeing on a palette.
 
 ## Security
@@ -65,11 +68,14 @@ decision that is a security property rather than a tidiness one.
 
 ## What is next
 
-`docs/PLAN.md` §8, shortest first: a shared `rig=` mDNS record so two daemons on
-one box can be recognised as one rig; a `--braemons-*` custom-property contract
-for theming, agreed while there are three UIs; a usable mDNS record for vstimd
-(port, `api`, `elements`); and rig switching exercised against real mDNS
-advertisements rather than `rigs.json` alone.
+All four daemons now advertise themselves over mDNS with a shared `rig=` record,
+so the console groups one box's daemons as one rig without guessing from the
+hostname. Each daemon advertises from inside itself while it runs; the box's
+own name, `braemons-XXXXXX`, comes from the `braemons-rig` package.
+
+`docs/PLAN.md` §8, what is left: a `--braemons-*` custom-property contract for
+theming, agreed while there are four UIs; and rig switching exercised against
+real mDNS advertisements rather than `rigs.json` alone.
 
 ## License
 

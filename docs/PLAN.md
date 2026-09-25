@@ -115,7 +115,7 @@ Consequences worth writing down:
   laptop" as the origin. That is settled by §7 (CORS `*`, network-level
   security), not by the helper.
 - **`avahi-browse` rather than a zeroconf npm package**, so the console keeps
-  zero dependencies (§6). A rig network already runs avahi; vstimd's `.deb`
+  zero dependencies (§6). A rig network already runs avahi; `braemons-rig`
   Recommends it. On a machine without it, discovery degrades to the configured
   list, which is the path a network with mDNS switched off takes anyway.
 - **Configured rigs must exist as a first-class path**, not a debug flag. mDNS is

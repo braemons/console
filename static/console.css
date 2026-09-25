@@ -65,6 +65,7 @@ main { padding: 16px; display: flex; flex-wrap: wrap; gap: 16px; align-items: fl
 [data-daemon="vstimd"]        { --source: #b98cff; }
 [data-daemon="statemachined"] { --source: #e0a458; }
 [data-daemon="triald"]        { --source: #4fc3a1; }
+[data-daemon="mousewheeld"]   { --source: #6fa8dc; }
 
 .slot {
   display: flex;

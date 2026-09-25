@@ -21,7 +21,12 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 
 /** The braemons service types. Adding a daemon is adding a line. */
-export const SERVICE_TYPES = ["_vstimd._tcp", "_statemachined._tcp", "_triald._tcp"];
+export const SERVICE_TYPES = [
+  "_vstimd._tcp",
+  "_statemachined._tcp",
+  "_triald._tcp",
+  "_mousewheeld._tcp",
+];
 
 /**
  * One `avahi-browse -rpt` line, which is `;`-separated and shell-unfriendly:

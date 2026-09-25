@@ -313,7 +313,7 @@ function showBanner(message, kind = "error") {
  * and where its module lives when the TXT record does not say.
  *
  * The tag lists are a fallback. A daemon's module exports its own names
- * (`STATEMACHINED_ELEMENT_NAMES`, `VSTIMD_ELEMENT_NAMES`) precisely so a console
+ * (`STATEMACHINED_ELEMENT_NAMES`, `VSTIMD_ELEMENT_NAMES`, …) precisely so a console
  * does not hard-code a list that goes stale when a panel is added, and the
  * loader below prefers that export. These are what to show when it is absent --
  * an older daemon, say -- and they are deliberately the *few* panels a rig-wide
@@ -337,6 +337,12 @@ const DAEMONS = {
     elements: "/elements/triald.js",
     namesExport: "TRIALD_ELEMENT_NAMES",
     preferred: ["triald-session"],
+  },
+  "_mousewheeld._tcp": {
+    name: "mousewheeld",
+    elements: "/elements/mousewheeld.js",
+    namesExport: "MOUSEWHEELD_ELEMENT_NAMES",
+    preferred: ["mousewheeld-device", "mousewheeld-trace", "mousewheeld-zones"],
   },
 };
 
