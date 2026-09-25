@@ -240,6 +240,11 @@ important that the console holds no domain logic and proxies nothing (§1, §3):
 - **The helper binds loopback.** `127.0.0.1`, not `0.0.0.0`, because it has no
   reason to be reachable and the machine it runs on is the least trusted thing
   in the picture.
+  **The exception is a console on the rig itself.** The Raspberry Pi image
+  installs `braemons-console` and sets `CONSOLE_HOST=0.0.0.0`, so a laptop
+  opens the console from the rig. That box is on the rig network already and
+  serves four daemons on it; the console adds a static page and a DNS-SD
+  browse, and still proxies nothing, so it does not widen what is reachable.
 
 **What changes if a daemon is ever reached from outside the rig network** — a
 recording from home, a second site — is a VPN or an authenticating reverse proxy
