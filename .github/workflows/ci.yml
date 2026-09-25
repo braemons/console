@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install nfpm and shellcheck
+        run: |
+          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v2.43.1/nfpm_2.43.1_Linux_x86_64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin nfpm
+          sudo apt-get install -y -qq shellcheck
+      - name: shellcheck
+        run: shellcheck packaging/*.sh scripts/git-version.sh
+      # Before the first tag there is no version to read; CI builds with a
+      # placeholder so a package that does not build is caught before a release.
+      - name: Build the package
+        run: make deb CONSOLE_VERSION=$(scripts/git-version.sh 2>/dev/null || echo 0.0.0~ci)
+      - name: Install it on Debian trixie, the base of Raspberry Pi OS, and serve a page
+        run: |
+          docker run --rm -v "$PWD/dist:/dist" debian:trixie-slim sh -ec '
+            apt-get update -qq
+            apt-get install -y -qq curl /dist/braemons-console_*.deb
+            test -f /etc/braemons/console.env
+            CONSOLE_RIGS=/etc/braemons/console-rigs.json node /usr/share/braemons/console/serve.mjs &
+            sleep 2
+            curl -fsS http://127.0.0.1:9000/ | grep -q "<html"
+            curl -fsS http://127.0.0.1:9000/api/rigs | grep -q "\"rigs\""'

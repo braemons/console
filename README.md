@@ -44,6 +44,26 @@ A daemon that is not running shows up as a panel that says so.
 `rigs.json` is where a rig goes if mDNS cannot find it — a supported path
 (`docs/PLAN.md` §3), not only a fallback for this bench setup.
 
+### As a package
+
+`braemons-console` is in the braemons apt archive, and the braemons Raspberry
+Pi image installs it. It runs as `braemons-console.service`, reads
+`/etc/braemons/console-rigs.json` instead of `rigs.json`, and takes its
+settings from `/etc/braemons/console.env`:
+
+| setting | default | |
+|---|---|---|
+| `CONSOLE_HOST` | `127.0.0.1` | the Raspberry Pi image sets `0.0.0.0`, so `http://braemons-XXXXXX.local:9000` opens it from a laptop |
+| `CONSOLE_PORT` | `9000` | |
+
+```sh
+make deb       # dist/braemons-console_<version>_all.deb
+make check     # node --check every module
+```
+
+The version is the latest `v*` tag, or `CONSOLE_VERSION=...`. A tag builds the
+release: `git tag v0.3.0-alpha1 && git push origin v0.3.0-alpha1`.
+
 ## What is on the page
 
 Every panel is independently **reorderable** (drag its header), **resizable**

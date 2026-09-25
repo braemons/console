@@ -1,0 +1,71 @@
+name: Release
+
+# Tag-driven, like every braemons repository:
+#
+#   git tag v0.3.0-alpha1 && git push origin v0.3.0-alpha1
+#
+# Builds braemons-console (arch: all) and attaches the .deb to a GitHub
+# release. braemons/packages pulls it into the apt archive from there; this
+# repository holds no signing key.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # git-version.sh reads the tag; a shallow clone has none.
+          fetch-depth: 0
+      - name: Install nfpm
+        run: |
+          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v2.43.1/nfpm_2.43.1_Linux_x86_64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin nfpm
+      - name: Resolve version
+        run: echo "building version $(make -s print-version)"
+      - run: make deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pkg
+          path: dist/*.deb
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pkg
+          path: release
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$GITHUB_REF_NAME
+          NOTES=$(cat <<'NOTES_EOF'
+          ## Installing
+
+          From the braemons apt archive (see braemons/packages):
+
+              sudo apt install braemons-console
+
+          Or from this file: `sudo apt install ./braemons-console_*_all.deb`.
+          It listens on http://127.0.0.1:9000. To open it from another machine,
+          set `CONSOLE_HOST=0.0.0.0` in `/etc/braemons/console.env`.
+          NOTES_EOF
+          )
+          PRERELEASE=""
+          case "$TAG" in *-*) PRERELEASE="--prerelease" ;; esac
+          gh release create "$TAG" release/* --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" --notes "$NOTES" $PRERELEASE

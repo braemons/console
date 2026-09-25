@@ -1,0 +1,24 @@
+[Unit]
+Description=braemons console: every daemon on the rig network, on one page
+Documentation=https://github.com/braemons/console
+# avahi-browse asks avahi-daemon; without it, only console-rigs.json is shown.
+After=network-online.target avahi-daemon.service
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=-/etc/braemons/console.env
+Environment=CONSOLE_RIGS=/etc/braemons/console-rigs.json
+ExecStart=/usr/bin/node /usr/share/braemons/console/serve.mjs
+Restart=on-failure
+RestartSec=5
+
+# It serves static files and runs avahi-browse, and needs nothing else.
+DynamicUser=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

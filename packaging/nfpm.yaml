@@ -1,0 +1,55 @@
+# braemons-console: the console as a service.
+#
+#   make deb      (from the repository root; VERSION comes from the git tag)
+#
+# Architecture-independent: node, two modules and the static shell. It needs no
+# npm dependencies, which is what lets it be one package with no build step.
+
+name: braemons-console
+arch: all
+platform: linux
+version: ${VERSION}
+section: science
+priority: optional
+maintainer: ${MAINTAINER}
+description: |
+  One page for every daemon on a braemons rig.
+  The display, the state machine, the trial logic and the wheel together.
+  Discovers the daemons over mDNS and lays out the
+  panels each of them serves. Holds no domain logic and proxies no daemon.
+  Listens on http://127.0.0.1:9000; set CONSOLE_HOST in
+  /etc/braemons/console.env to reach it from other machines.
+vendor: braemons
+homepage: https://github.com/braemons/console
+license: AGPL-3.0-or-later
+
+depends:
+  - systemd
+  # Top-level await. Debian bookworm ships 18, trixie 20.
+  - nodejs (>= 18)
+# avahi-browse, for discovery. Without it only console-rigs.json is shown.
+recommends:
+  - avahi-utils
+
+contents:
+  - src: ../serve.mjs
+    dst: /usr/share/braemons/console/serve.mjs
+  - src: ../discovery.mjs
+    dst: /usr/share/braemons/console/discovery.mjs
+  - src: ../static/
+    dst: /usr/share/braemons/console/static/
+    type: tree
+
+  - src: ./braemons-console.service
+    dst: /lib/systemd/system/braemons-console.service
+
+  - src: ./console.env
+    dst: /etc/braemons/console.env
+    type: config|noreplace
+  - src: ./console-rigs.json
+    dst: /etc/braemons/console-rigs.json
+    type: config|noreplace
+
+scripts:
+  postinstall: ./postinstall.sh
+  preremove: ./preremove.sh
