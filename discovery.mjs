@@ -102,6 +102,13 @@ async function browse(type) {
     const { stdout } = await run("avahi-browse", ["-rpt", type], { timeout: 5000 });
     return dedupeResolutions(stdout.split("\n").map(parseBrowseLine).filter(Boolean));
   } catch (error) {
+    // Killed at the timeout, which is what a stale record does: a daemon that
+    // stopped leaves an advertisement avahi keeps trying to resolve. What was
+    // printed before that is still good, so it is kept rather than reported
+    // as a failure of the whole service type.
+    if (error.killed && error.stdout) {
+      return dedupeResolutions(error.stdout.split("\n").map(parseBrowseLine).filter(Boolean));
+    }
     // avahi-browse missing, or avahi-daemon down. Neither is fatal: the
     // configured rigs below still work, which is the path a network with mDNS
     // switched off has to take anyway.

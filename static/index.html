@@ -31,8 +31,18 @@
       </label>
       <div id="minimize-controls" class="minimize-controls"></div>
       <button id="reset-layout" class="reset-layout" title="clear the remembered order, sizes, docked and hidden panels for this rig">reset layout</button>
+      <button id="add-rig-toggle" class="reset-layout" title="scan a host for braemons daemons and add it as a rig, in this browser">+ rig</button>
+      <button id="rescan" class="reset-layout" title="browse the network for daemons again">rescan</button>
       <span id="discovery-state" class="muted">discovering…</span>
     </header>
+
+    <form id="add-rig" class="add-rig" hidden>
+      <input id="add-rig-host" required autocomplete="off" spellcheck="false"
+        placeholder="host or address — braemons-a1b2c3.local, 10.0.1.42, or host:port for one daemon" />
+      <button type="submit">scan</button>
+      <button type="button" id="add-rig-cancel">cancel</button>
+      <span id="add-rig-state" class="muted"></span>
+    </form>
 
     <div id="banner" class="banner" hidden></div>
     <div id="dock" class="dock" hidden></div>
