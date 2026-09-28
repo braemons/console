@@ -252,6 +252,96 @@ in front of the whole segment, not authentication added to three daemons in thre
 languages. Keeping the boundary in one place is the thing this decision is
 actually choosing.
 
+### 7.1 If a rig ever leaves an isolated network
+
+**Not planned: rigs run on isolated lab networks, and §7 stands.** This is the
+concept for the day that stops being true, written down now so that nothing
+built in the meantime makes it expensive. Tracked in
+braemons/console#2.
+
+The tempting answer is to expose only the console, since one thing is easier to
+secure than five. It does not survive contact with how rigs are used: people
+drive the daemons from Python, over gRPC, without a browser anywhere. So the
+daemons' APIs have to be reachable from off the box regardless, and the question
+is what stands in front of them.
+
+**One authenticating gateway on the rig, and daemons that stay as they are.**
+
+```
+laptop browser ─┐                          ┌─ vstimd        127.0.0.1
+Python client ──┼─ TLS + token ─▶ gateway ─┼─ statemachined 127.0.0.1
+                │     :443       (Envoy /  ├─ triald        127.0.0.1
+                │                 Caddy)   └─ mousewheeld   127.0.0.1
+```
+
+- **The daemons bind loopback and do no authentication.** Authentication done
+  once, in a proxy that exists to do it, rather than four times in Rust and
+  Python by people whose job is stimulus timing. This is §7's last paragraph,
+  made concrete.
+- **gRPC goes through one port.** Every call's path is
+  `/package.Service/Method`, so the gateway routes by service name. A Python
+  client changes its channel and nothing else:
+  ```python
+  creds = grpc.composite_channel_credentials(
+      grpc.ssl_channel_credentials(ca_pem),
+      grpc.access_token_call_credentials(token))
+  channel = grpc.secure_channel("rig-b16b46.lab.example:443", creds)
+  ```
+- **HTTP goes through it by path prefix** — `/vstimd/…`, `/triald/…` — and so
+  does the console. Everything the browser loads then has one origin, so
+  `CORS: *` goes away rather than being narrowed, and a login page on the
+  gateway can set a cookie. That is also what covers WebSockets
+  (`/api/trace/stream`), which cannot carry an `authorization` header from a
+  browser.
+- **This does not make the console a bridge** (§7). The gateway is the
+  boundary, on the rig, deliberately; the console still proxies nothing.
+
+**Authentication: a token, with client certificates as the stronger option.**
+
+- *Bearer tokens* first. A few random tokens per rig in a root-only file under
+  `/etc/braemons/`, sent as `authorization: Bearer …` in gRPC metadata or an
+  HTTP header. Easy to hand to a student, easy to revoke, and useless without
+  TLS — anyone on the segment reads them otherwise.
+- *mTLS* for scripts and long-lived clients, which gRPC supports natively.
+  Client certificates in browsers are miserable to install, so not for people.
+- *Server certificates* from a small lab CA (`step-ca`, or a script in
+  `braemons-rig` issuing one per rig), whose root is installed on lab laptops
+  once. `.local` names cannot have public certificates, and a rig on a bigger
+  network needs a real DNS name anyway.
+
+**Authorization: two levels, and no more.** Roles and rights management are a
+non-goal.
+
+- *observer*: reads — state, trace streams, counters.
+- *operator*: everything else.
+
+Enforced in the gateway by method name, from a short list. **triald's policy
+upload is a separate switch, off from the network by default**: it is remote
+code execution by design (§7), and "operator" should not quietly include "can
+run Python as the rig".
+
+**What the gateway does not cover.**
+
+- **ZeroMQ.** vstimd (5555, 5556) and mousewheeld (5557) publish over ZMQ,
+  which an HTTP/gRPC proxy cannot carry. Keep those on loopback if outside
+  clients only need gRPC, which is the simpler answer; ZMQ's CURVE is the
+  answer if they do not.
+- **mDNS.** It does not cross subnets, and on a shared network it tells
+  everyone what runs where. Such a rig is started with `--no-mdns` and listed in
+  `console-rigs.json` (§3).
+
+**Cheaper steps before any of it.** A VPN (WireGuard, Tailscale) into the rig
+network changes no code and is usually the right answer to "reach the rig from
+my office". The gateway is for a rig that has to *sit on* a shared network.
+
+**What to keep true now, so this stays cheap:**
+
+1. Every daemon can bind loopback (`--host`), and nothing hard-codes `0.0.0.0`.
+2. Every panel honours `base` exactly as given, **including a path** —
+   `https://rig/vstimd`, not only `http://rig:8080`. The `/elements/` contract
+   already says `base`; it has to mean it.
+3. Clients accept a TLS channel and a token, even while nothing checks them.
+
 ## 8. What is next, in order
 
 **Done since this document's last update:**
