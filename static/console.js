@@ -310,7 +310,8 @@ function showBanner(message, kind = "error") {
  *
  * This table is the console's *entire* daemon-specific surface, and keeping it
  * this small is the design working. A new daemon is a row: the tags it offers,
- * and where its module lives when the TXT record does not say.
+ * where its module lives when the TXT record does not say, and the port its
+ * package listens on (the helper's LOCAL_PORTS says the same, for loopback).
  *
  * The tag lists are a fallback. A daemon's module exports its own names
  * (`STATEMACHINED_ELEMENT_NAMES`, `VSTIMD_ELEMENT_NAMES`, …) precisely so a console
@@ -323,24 +324,28 @@ const DAEMONS = {
   "_statemachined._tcp": {
     name: "statemachined",
     elements: "/elements/statemachined.js",
+    port: 8081, // where its package's unit listens; what "+ rig" scans
     namesExport: "STATEMACHINED_ELEMENT_NAMES",
     preferred: ["statemachined-device", "statemachined-session", "statemachined-lines"],
   },
   "_vstimd._tcp": {
     name: "vstimd",
     elements: "/elements/vstimd.js",
+    port: 8080, // where its package's unit listens; what "+ rig" scans
     namesExport: "VSTIMD_ELEMENT_NAMES",
     preferred: ["vstimd-map", "vstimd-stimuli", "vstimd-lines"],
   },
   "_triald._tcp": {
     name: "triald",
     elements: "/elements/triald.js",
+    port: 8420, // where its package's unit listens; what "+ rig" scans
     namesExport: "TRIALD_ELEMENT_NAMES",
     preferred: ["triald-session"],
   },
   "_mousewheeld._tcp": {
     name: "mousewheeld",
     elements: "/elements/mousewheeld.js",
+    port: 8083, // where its package's unit listens; what "+ rig" scans
     namesExport: "MOUSEWHEELD_ELEMENT_NAMES",
     preferred: ["mousewheeld-device", "mousewheeld-trace", "mousewheeld-zones"],
   },
@@ -348,7 +353,9 @@ const DAEMONS = {
 
 /** The daemon's origin, as a browser has to address it. */
 function baseUrlFor(daemon) {
-  const host = daemon.host || daemon.address;
+  // Found on the console's own loopback: reachable at whatever name reached the
+  // console, which is this box's -- 127.0.0.1 would be the laptop's.
+  const host = daemon.origin === "local" ? location.hostname : daemon.host || daemon.address;
   return `http://${host}:${daemon.port}`;
 }
 
@@ -383,7 +390,9 @@ async function mountDaemon(daemon) {
 
   let module;
   try {
-    module = await import(/* @vite-ignore */ elementsUrlFor(daemon, spec));
+    const url = elementsUrlFor(daemon, spec);
+    importedFrom.set(spec.name, url);
+    module = await import(/* @vite-ignore */ url);
   } catch (error) {
     // Almost always one of two things, and they are worth telling apart in the
     // message because the fixes are unrelated: the daemon is down (connection
@@ -469,11 +478,39 @@ function markSlot(slot, kind, text) {
 }
 
 /** Draw one rig: clear the panels, then mount every daemon on it at once. */
+/*
+ * One page, one module per daemon.
+ *
+ * A tag can be defined once per page, and every vstimd defines `vstimd-map`.
+ * So a rig whose vstimd lives somewhere else than the one this page already
+ * imported cannot be shown in place: its module would throw at `define` --
+ * and a different build's element under the same name would be wrong even if
+ * it did not. Switching to such a rig reloads the page onto it instead; the
+ * rig is in the URL's fragment, which is also what makes a tab bookmarkable.
+ */
+const importedFrom = new Map(); // daemon name -> the elements URL this page imported
+
+function needsFreshPage(rig) {
+  return rig.daemons.some((daemon) => {
+    const spec = DAEMONS[daemon.service];
+    const previous = spec && importedFrom.get(spec.name);
+    return previous !== undefined && previous !== elementsUrlFor(daemon, spec);
+  });
+}
+
 function showRig(rig) {
+  if (needsFreshPage(rig)) {
+    location.hash = encodeURIComponent(rig.key);
+    location.reload();
+    return;
+  }
+  history.replaceState(null, "", `#${encodeURIComponent(rig.key)}`);
   panels.replaceChildren();
   currentRigKey = rig.key; // read by makeSlot (saved sizes) and the drag handlers (saved order)
   currentRig = rig; // read by hidePanel/unhidePanel to redraw this rig after a change
-  for (const button of nav.children) button.setAttribute("aria-current", String(button.dataset.key === rig.key));
+  for (const button of nav.querySelectorAll("button[data-key]")) {
+    button.setAttribute("aria-current", String(button.dataset.key === rig.key));
+  }
 
   if (rig.grouping === "resolved-host") {
     // Say so. Grouping by host is a guess that two daemons answering on one
@@ -504,32 +541,216 @@ function showRig(rig) {
   renderMinimizeControls();
 }
 
-async function main() {
+/*
+ * Rigs added by hand, from this page.
+ *
+ * For a rig mDNS cannot see -- another subnet, a network with multicast
+ * filtered, a daemon started with --no-mdns -- without editing
+ * console-rigs.json on the box. Kept in this browser only, on purpose: a list
+ * shared through the helper would need a write endpoint on a server that
+ * listens on the rig network, and would let anyone there choose which modules
+ * every other viewer's page imports. Per browser, the worst an entry can do is
+ * to the person who typed it.
+ *
+ * Stored as what was found -- host, and which daemon on which port -- and not
+ * re-scanned on load: a daemon that is down later shows as a panel saying so,
+ * which is more useful than a rig that silently vanished from the nav.
+ */
+const ADDED_RIGS_KEY = "console.addedRigs";
+
+function loadAddedRigs() {
+  try {
+    const list = JSON.parse(globalThis.localStorage.getItem(ADDED_RIGS_KEY) ?? "[]");
+    return Array.isArray(list) ? list.filter((r) => typeof r?.host === "string" && Array.isArray(r.daemons)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAddedRigs(list) {
+  try {
+    globalThis.localStorage.setItem(ADDED_RIGS_KEY, JSON.stringify(list));
+  } catch {
+    showBanner("This browser would not store the rig list; it lasts until the page is reloaded.", "info");
+  }
+}
+
+/** An added rig, in the shape /api/rigs uses, so the rest of the shell has one code path. */
+function rigFromAdded({ host, daemons }) {
+  return {
+    key: `added:${host}`,
+    grouping: "added",
+    host,
+    daemons: daemons.map(({ daemon, port }) => ({
+      service: `_${daemon}._tcp`,
+      displayName: daemon,
+      host,
+      address: host,
+      port,
+      txt: { elements: `/elements/${daemon}.js` },
+      origin: "added",
+    })),
+  };
+}
+
+/**
+ * Which braemons daemons answer on `hostname`.
+ *
+ * Asked by the browser, not the helper, because the question that matters is
+ * whether *this browser* can reach them -- the helper may sit on a different
+ * network entirely. Each daemon serves its `/elements/` module with CORS `*`
+ * (§7), so a fetch is enough. The content type is checked because a web UI
+ * that falls back to index.html answers 200 for any path.
+ *
+ * With `onlyPort`, every daemon is looked for on that one port: the answer to
+ * "I started it on 9100".
+ */
+async function scanHost(hostname, onlyPort) {
+  const found = await Promise.all(
+    Object.values(DAEMONS).map(async (spec) => {
+      const port = onlyPort ?? spec.port;
+      try {
+        const res = await fetch(`http://${hostname}:${port}${spec.elements}`, {
+          signal: AbortSignal.timeout(3000),
+        });
+        await res.body?.cancel();
+        const isModule = /javascript/.test(res.headers.get("content-type") ?? "");
+        return res.ok && isModule ? { daemon: spec.name, port } : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return found.filter(Boolean);
+}
+
+/** `braemons-a1b2c3.local`, `10.0.1.42:9100`, or a pasted `http://…` URL. */
+function parseHostInput(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    const url = new URL(/^https?:\/\//.test(trimmed) ? trimmed : `http://${trimmed}`);
+    return { hostname: url.hostname, port: url.port ? Number(url.port) : undefined };
+  } catch {
+    return null;
+  }
+}
+
+let discoveredRigs = [];
+
+function allRigs() {
+  return [...discoveredRigs, ...loadAddedRigs().map(rigFromAdded)];
+}
+
+/** The nav, from discovered and added rigs together; shows `preferKey` if it is still there. */
+function renderNav(preferKey) {
+  nav.replaceChildren();
+  const rigs = allRigs();
+  discoveryState.textContent = `${rigs.length} rig${rigs.length === 1 ? "" : "s"}`;
+
+  for (const rig of rigs) {
+    const button = document.createElement("button");
+    button.className = "rig-select";
+    button.textContent = rig.host ?? rig.key;
+    button.dataset.key = rig.key;
+    button.title = rig.grouping === "added" ? "added by hand, in this browser" : "discovered";
+    button.addEventListener("click", () => showRig(rig));
+    if (rig.grouping !== "added") {
+      nav.append(button);
+      continue;
+    }
+    const remove = document.createElement("button");
+    remove.className = "rig-remove";
+    remove.textContent = "✕";
+    remove.title = `remove ${rig.host} from this browser's rigs`;
+    remove.addEventListener("click", () => {
+      saveAddedRigs(loadAddedRigs().filter((r) => r.host !== rig.host));
+      renderNav(currentRigKey === rig.key ? undefined : currentRigKey);
+    });
+    const tab = document.createElement("span");
+    tab.className = "rig-tab";
+    tab.append(button, remove);
+    nav.append(tab);
+  }
+
+  if (!rigs.length) {
+    panels.replaceChildren();
+    return showBanner("No rigs found. Start a daemon, or add a rig with + rig.", "info");
+  }
+  showRig(rigs.find((r) => r.key === preferKey) ?? rigs[0]);
+}
+
+/** Ask the helper what is on the network, then redraw the nav around it. */
+async function discover() {
+  discoveryState.textContent = "discovering…";
   let payload;
   try {
     payload = await fetch("/api/rigs").then((r) => r.json());
   } catch (error) {
     discoveryState.textContent = "discovery failed";
-    return showBanner(`Could not reach the console helper: ${error.message}`);
+    showBanner(`Could not reach the console helper: ${error.message}`);
+    payload = { rigs: [], problems: [] };
   }
 
-  const { rigs, problems } = payload;
-  discoveryState.textContent = `${rigs.length} rig${rigs.length === 1 ? "" : "s"}`;
-  if (problems.length) {
-    showBanner(`mDNS browse failed (${problems.map((p) => p.type).join(", ")}); showing configured rigs only.`, "info");
+  discoveredRigs = payload.rigs;
+  banner.hidden = true;
+  // Said before the nav is drawn, so the reason discovery failed is not
+  // overwritten by its consequence.
+  if (payload.problems.length) {
+    const reason = payload.problems[0].error.trim().split("\n").pop();
+    showBanner(`mDNS browse failed (${reason}). Showing local, configured and added rigs only.`, "info");
   }
-  if (!rigs.length) {
-    return showBanner("No rigs found. Start a daemon, or add one to rigs.json.", "info");
-  }
-
-  for (const rig of rigs) {
-    const button = document.createElement("button");
-    button.textContent = rig.host ?? rig.key;
-    button.dataset.key = rig.key;
-    button.addEventListener("click", () => showRig(rig));
-    nav.append(button);
-  }
-  showRig(rigs[0]);
+  renderNav(currentRigKey ?? (decodeURIComponent(location.hash.slice(1)) || undefined));
 }
 
-main();
+const addRigForm = document.getElementById("add-rig");
+const addRigHost = document.getElementById("add-rig-host");
+const addRigState = document.getElementById("add-rig-state");
+
+function openAddRig(open) {
+  addRigForm.hidden = !open;
+  addRigState.textContent = "";
+  if (open) addRigHost.focus();
+}
+
+document.getElementById("add-rig-toggle").addEventListener("click", () => openAddRig(addRigForm.hidden));
+document.getElementById("add-rig-cancel").addEventListener("click", () => openAddRig(false));
+document.getElementById("rescan").addEventListener("click", () => discover());
+
+addRigForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const target = parseHostInput(addRigHost.value);
+  if (!target) {
+    addRigState.textContent = "not a host name or address";
+    return;
+  }
+
+  const submit = addRigForm.querySelector("button[type=submit]");
+  submit.disabled = true;
+  addRigState.textContent = `scanning ${target.hostname}…`;
+  const found = await scanHost(target.hostname, target.port);
+  submit.disabled = false;
+
+  if (!found.length) {
+    const ports = target.port ?? Object.values(DAEMONS).map((spec) => spec.port).join(", ");
+    addRigState.textContent =
+      `nothing answered on ${target.hostname} (port ${ports}). ` +
+      `Is the daemon listening on 0.0.0.0, and reachable from this machine?`;
+    return;
+  }
+
+  // Scanning a host again replaces what was stored for it: that is "rescan"
+  // for an added rig. A host:port scan adds to it instead, so a daemon moved to
+  // an odd port can join the rest of its box.
+  const others = loadAddedRigs().filter((r) => r.host !== target.hostname);
+  const previous = loadAddedRigs().find((r) => r.host === target.hostname);
+  const kept = target.port && previous ? previous.daemons.filter((d) => !found.some((f) => f.daemon === d.daemon)) : [];
+  saveAddedRigs([...others, { host: target.hostname, daemons: [...kept, ...found] }]);
+
+  openAddRig(false);
+  addRigHost.value = "";
+  renderNav(`added:${target.hostname}`);
+  showBanner(`Added ${target.hostname}: ${found.map((f) => `${f.daemon} on ${f.port}`).join(", ")}. Stored in this browser only.`, "info");
+});
+
+discover();

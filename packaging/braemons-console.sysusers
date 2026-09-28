@@ -1,0 +1,5 @@
+# The user braemons-console.service runs as. A static one rather than
+# DynamicUser=: avahi-browse talks to avahi-daemon over the system bus, and
+# dbus-daemon never completes the handshake for a dynamic uid, so a dynamic
+# console discovers nothing.
+u braemons-console - "braemons console" / /usr/sbin/nologin

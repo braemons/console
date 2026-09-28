@@ -41,8 +41,18 @@ node serve.mjs          # http://127.0.0.1:9000
 with any of `statemachined serve`, `triald serve`, `vstimd` and
 `mousewheeld serve` running (`mousewheeld serve --simulate` needs no board).
 A daemon that is not running shows up as a panel that says so.
-`rigs.json` is where a rig goes if mDNS cannot find it — a supported path
-(`docs/PLAN.md` §3), not only a fallback for this bench setup.
+
+A rig is found three ways:
+
+- **mDNS**, for every daemon on the network that advertises itself;
+- **loopback**, for the daemons on the machine the console runs on, probed on
+  their packaged ports (vstimd 8080, statemachined 8081, mousewheeld 8083,
+  triald 8420);
+- **by hand**: **+ rig** on the page scans a host (or one `host:port`) from the
+  browser and adds what answers. Kept in that browser only — see `console.js`
+  for why a shared list is deliberately not offered. `rigs.json` is the same
+  thing for everyone who opens this console, edited on the box
+  (`docs/PLAN.md` §3).
 
 ### As a package
 

@@ -42,6 +42,19 @@ main.snap-grid {
   background-position: 16px 16px; /* aligns with main's own padding */
 }
 
+/* Adding a rig by hand: a row under the bar, open only while it is used. */
+.add-rig { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+.add-rig[hidden] { display: none; }
+.add-rig input { flex: 0 1 34em; min-width: 0; background: var(--panel); border: 1px solid var(--line); color: #ddd; padding: 4px 8px; border-radius: 4px; font: inherit; font-size: 13px; }
+.add-rig button { background: none; border: 1px solid var(--line); color: #ccc; padding: 3px 10px; border-radius: 4px; cursor: pointer; font: inherit; font-size: 12px; }
+.add-rig button:hover { border-color: #666; }
+
+/* An added rig's tab carries its own remove button beside it. */
+.rig-tab { display: inline-flex; }
+.rig-tab .rig-select { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.rig-tab .rig-remove { border-left: none; border-top-left-radius: 0; border-bottom-left-radius: 0; color: var(--dim); padding: 4px 7px; }
+.rig-tab .rig-remove:hover { color: var(--bad); }
+
 .banner { margin: 8px 16px; padding: 8px 12px; border-radius: 4px; background: #3a1f1f; border: 1px solid #6a3030; }
 .banner.info { background: #1f2a3a; border-color: #30506a; }
 

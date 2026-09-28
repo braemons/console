@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+# The unit's User=, before anything starts it.
+systemd-sysusers /usr/lib/sysusers.d/braemons-console.conf || true
+
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true
 fi
