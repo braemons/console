@@ -16,6 +16,7 @@
 // avahi-daemon -- vstimd's packaging Recommends it.
 
 import { execFile } from "node:child_process";
+import { hostname } from "node:os";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
@@ -42,6 +43,8 @@ function parseBrowseLine(line) {
   for (const m of f.slice(9).join(";").matchAll(/"([^"=]+)=([^"]*)"/g)) txt[m[1]] = m[2];
   return {
     service: f[4],
+    iface: f[1],
+    protocol: f[2],
     displayName: f[3],
     host: f[6],
     address: f[7],
@@ -73,17 +76,84 @@ function rigKeyFor(service) {
   return { key: `host:${service.host || service.address}`, grouping: "resolved-host" };
 }
 
+/**
+ * One entry per advertised service, not one per interface.
+ *
+ * avahi-browse resolves a service once for every interface and protocol it was
+ * seen on -- eth0 IPv4, eth0 IPv6, lo -- and each of those would otherwise be
+ * a full set of panels. Prefer the one a laptop can use: IPv4, not loopback.
+ */
+function rankResolution(s) {
+  return (s.protocol === "IPv4" ? 0 : 2) + (s.iface === "lo" ? 1 : 0);
+}
+
+function dedupeResolutions(services) {
+  const best = new Map();
+  for (const s of services) {
+    const id = `${s.service}|${s.displayName}`;
+    if (!best.has(id) || rankResolution(s) < rankResolution(best.get(id))) best.set(id, s);
+  }
+  return [...best.values()];
+}
+
 /** Browse one service type. A type nobody advertises is not an error. */
 async function browse(type) {
   try {
     const { stdout } = await run("avahi-browse", ["-rpt", type], { timeout: 5000 });
-    return stdout.split("\n").map(parseBrowseLine).filter(Boolean);
+    return dedupeResolutions(stdout.split("\n").map(parseBrowseLine).filter(Boolean));
   } catch (error) {
     // avahi-browse missing, or avahi-daemon down. Neither is fatal: the
     // configured rigs below still work, which is the path a network with mDNS
     // switched off has to take anyway.
     return { error: String(error.message ?? error), type };
   }
+}
+
+/**
+ * Where each daemon listens when nobody told it otherwise -- the ports its
+ * package's unit passes. A console installed on a rig checks these on loopback,
+ * so the box it runs on shows up with no mDNS and no console-rigs.json.
+ */
+export const LOCAL_PORTS = {
+  vstimd: 8080,
+  statemachined: 8081,
+  mousewheeld: 8083,
+  triald: 8420,
+};
+
+/**
+ * The daemons answering on this box's loopback.
+ *
+ * Not a conversation with a daemon: one GET of the module the browser is about
+ * to import anyway, to learn whether anything is there. What it finds is
+ * reported with `address: 127.0.0.1` and `origin: "local"`, and the shell
+ * addresses it through whatever host name the browser used to reach the
+ * console, since 127.0.0.1 means the laptop to a laptop.
+ */
+async function probeLocal() {
+  const found = await Promise.all(
+    Object.entries(LOCAL_PORTS).map(async ([daemon, port]) => {
+      const elements = `/elements/${daemon}.js`;
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}${elements}`, {
+          signal: AbortSignal.timeout(1000),
+        });
+        await res.body?.cancel();
+        if (!res.ok) return null;
+      } catch {
+        return null; // nothing listening, which is the usual answer
+      }
+      return {
+        service: `_${daemon}._tcp`,
+        displayName: daemon,
+        host: `${hostname()}.local`,
+        address: "127.0.0.1",
+        port,
+        txt: { elements },
+      };
+    }),
+  );
+  return found.filter(Boolean);
 }
 
 /**
@@ -95,7 +165,7 @@ async function browse(type) {
  * do. They are merged into the same shape so the shell has one code path.
  */
 export async function discoverRigs(configured = []) {
-  const results = await Promise.all(SERVICE_TYPES.map(browse));
+  const [local, ...results] = await Promise.all([probeLocal(), ...SERVICE_TYPES.map(browse)]);
   const problems = results.filter((r) => !Array.isArray(r));
   const services = results.filter(Array.isArray).flat();
 
@@ -107,22 +177,25 @@ export async function discoverRigs(configured = []) {
   };
 
   for (const s of services) add(s, "mdns");
-  for (const c of configured) {
-    const url = new URL(c.base);
-    add(
-      {
-        service: `_${c.daemon}._tcp`,
-        displayName: c.name ?? url.hostname,
-        host: url.hostname,
-        address: url.hostname,
-        port: Number(url.port),
-        // `elements` is where the module lives. It is a TXT record on a
-        // discovered daemon for a reason -- a proxy can move it -- so a
-        // configured one has to be able to say it too.
-        txt: { elements: c.elements, api: c.api ?? "/api", rig: c.rig },
-      },
-      "configured",
-    );
+
+  // This box's own daemons join the rig mDNS put this host in -- the one named
+  // by a rig= record, when a daemon here publishes one -- and a probed daemon
+  // replaces the advertised one: it was just seen serving its elements, which
+  // an advertisement does not promise (vstimd's static avahi record names its
+  // ZMQ port). A group left empty by that was only ever this box, and goes.
+  if (local.length) {
+    const here = `${hostname()}.local`.toLowerCase();
+    const onThisBox = (d) => d.host?.toLowerCase() === here;
+    const mine = [...rigs.values()].filter((r) => r.daemons.some(onThisBox));
+    const home =
+      mine.find((r) => r.grouping === "rig-txt-record") ?? mine[0] ?? rigs.get(rigKeyFor(local[0]).key);
+    const probed = new Set(local.map((d) => d.service));
+    for (const rig of mine) {
+      rig.daemons = rig.daemons.filter((d) => !(onThisBox(d) && probed.has(d.service)));
+      if (!rig.daemons.length && rig !== home) rigs.delete(rig.key);
+    }
+    if (home) for (const d of local) home.daemons.push({ ...d, origin: "local" });
+    else for (const d of local) add(d, "local");
   }
 
   return { rigs: [...rigs.values()], problems };

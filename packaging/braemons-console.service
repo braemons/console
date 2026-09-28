@@ -13,7 +13,11 @@ Restart=on-failure
 RestartSec=5
 
 # It serves static files and runs avahi-browse, and needs nothing else.
-DynamicUser=yes
+# Its own static user (packaging/braemons-console.sysusers), not DynamicUser=:
+# avahi-browse goes through the system bus, and dbus-daemon never finishes the
+# handshake for a dynamic uid -- discovery then fails and finds nothing.
+User=braemons-console
+Group=braemons-console
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes

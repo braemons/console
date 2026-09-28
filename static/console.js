@@ -348,7 +348,9 @@ const DAEMONS = {
 
 /** The daemon's origin, as a browser has to address it. */
 function baseUrlFor(daemon) {
-  const host = daemon.host || daemon.address;
+  // Found on the console's own loopback: reachable at whatever name reached the
+  // console, which is this box's -- 127.0.0.1 would be the laptop's.
+  const host = daemon.origin === "local" ? location.hostname : daemon.host || daemon.address;
   return `http://${host}:${daemon.port}`;
 }
 
@@ -515,12 +517,15 @@ async function main() {
 
   const { rigs, problems } = payload;
   discoveryState.textContent = `${rigs.length} rig${rigs.length === 1 ? "" : "s"}`;
-  if (problems.length) {
-    showBanner(`mDNS browse failed (${problems.map((p) => p.type).join(", ")}); showing configured rigs only.`, "info");
-  }
+  // Said together, so the reason discovery failed is not overwritten by its
+  // consequence.
+  const browseFailed = problems.length
+    ? `mDNS browse failed (${problems[0].error.trim().split("\n").pop()}). `
+    : "";
   if (!rigs.length) {
-    return showBanner("No rigs found. Start a daemon, or add one to rigs.json.", "info");
+    return showBanner(`${browseFailed}No rigs found. Start a daemon, or add one to console-rigs.json.`, "info");
   }
+  if (browseFailed) showBanner(`${browseFailed}Showing local and configured daemons only.`, "info");
 
   for (const rig of rigs) {
     const button = document.createElement("button");

@@ -43,6 +43,9 @@ contents:
   - src: ./braemons-console.service
     dst: /lib/systemd/system/braemons-console.service
 
+  - src: ./braemons-console.sysusers
+    dst: /usr/lib/sysusers.d/braemons-console.conf
+
   - src: ./console.env
     dst: /etc/braemons/console.env
     type: config|noreplace
