@@ -178,6 +178,24 @@ export async function discoverRigs(configured = []) {
 
   for (const s of services) add(s, "mdns");
 
+  for (const c of configured) {
+    const url = new URL(c.base);
+    add(
+      {
+        service: `_${c.daemon}._tcp`,
+        displayName: c.name ?? url.hostname,
+        host: url.hostname,
+        address: url.hostname,
+        port: Number(url.port),
+        // `elements` is where the module lives. It is a TXT record on a
+        // discovered daemon for a reason -- a proxy can move it -- so a
+        // configured one has to be able to say it too.
+        txt: { elements: c.elements, api: c.api ?? "/api", rig: c.rig },
+      },
+      "configured",
+    );
+  }
+
   // This box's own daemons join the rig mDNS put this host in -- the one named
   // by a rig= record, when a daemon here publishes one -- and a probed daemon
   // replaces the advertised one: it was just seen serving its elements, which
